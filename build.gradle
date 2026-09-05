@@ -28,22 +28,24 @@ dependencyManagement {
 }
 
 dependencies {
-	// Web: expone el endpoint REST (Jackson + Tomcat embebido incluidos)
+	// Web: exposes the REST endpoint (including embedded Jackson + Tomcat)
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 
-	// Persistencia: adaptador de salida del puerto de repositorio (Hibernate + HikariCP)
+	// Persistence: repository port output adapter (Hibernate + HikariCP)
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 
-	// Validación de los parámetros de entrada del endpoint (Bean Validation)
+	// Endpoint input parameter validation (Bean Validation)
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 
-	// Soporte de arquitectura modulith: verifica los límites entre módulos
+	// Modulith architecture support: checks boundaries between modules
 	implementation 'org.springframework.modulith:spring-modulith-starter-core'
 
-	// Base de datos en memoria pedida en el enunciado
+	// In-memory database
 	runtimeOnly 'com.h2database:h2'
 
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+	testImplementation 'org.springframework.boot:spring-boot-webmvc-test'
 	testImplementation 'org.springframework.modulith:spring-modulith-starter-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
