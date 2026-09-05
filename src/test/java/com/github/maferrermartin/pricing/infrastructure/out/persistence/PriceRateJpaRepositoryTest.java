@@ -24,7 +24,7 @@ class PriceRateJpaRepositoryTest {
 				BRAND_ID, PRODUCT_ID, LocalDateTime.of(2020, 6, 14, 16, 0), Limit.of(1));
 
 		assertThat(candidates).hasSize(1);
-		assertThat(candidates.get(0).getPriceList()).isEqualTo(2L);
+		assertThat(candidates.getFirst().getPriceList()).isEqualTo(2L);
 	}
 
 	@Test
@@ -33,7 +33,7 @@ class PriceRateJpaRepositoryTest {
 				BRAND_ID, PRODUCT_ID, LocalDateTime.of(2020, 6, 14, 21, 0), Limit.of(1));
 
 		assertThat(candidates).hasSize(1);
-		assertThat(candidates.get(0).getPriceList()).isEqualTo(1L);
+		assertThat(candidates.getFirst().getPriceList()).isEqualTo(1L);
 	}
 
 	@Test
