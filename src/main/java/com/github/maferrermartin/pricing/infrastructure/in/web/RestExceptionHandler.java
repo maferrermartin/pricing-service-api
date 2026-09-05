@@ -10,6 +10,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.LocalDateTime;
 
@@ -35,6 +36,12 @@ class RestExceptionHandler {
 	@ExceptionHandler(ConstraintViolationException.class)
 	ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex) {
 		return badRequest("Parámetros de consulta inválidos: " + ex.getMessage());
+	}
+
+	@ExceptionHandler(NoResourceFoundException.class)
+	ResponseEntity<ErrorResponse> handleNoResourceFound(NoResourceFoundException ex) {
+		return ResponseEntity.status(HttpStatus.NOT_FOUND)
+				.body(ErrorResponse.of(HttpStatus.NOT_FOUND, "Recurso no encontrado: '" + ex.getResourcePath() + "'"));
 	}
 
 	@ExceptionHandler(Exception.class)

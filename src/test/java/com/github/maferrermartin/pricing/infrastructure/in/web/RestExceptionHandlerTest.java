@@ -8,9 +8,11 @@ import java.util.Set;
 import jakarta.validation.ConstraintViolationException;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 class RestExceptionHandlerTest {
 
@@ -55,6 +57,16 @@ class RestExceptionHandlerTest {
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
 		assertThat(response.getBody().message()).contains("debe ser mayor que 0");
+	}
+
+	@Test
+	void noResourceFoundReturns404InsteadOfTheGenericCatchAll() {
+		var ex = new NoResourceFoundException(HttpMethod.GET, "esto-no-existe", "/esto-no-existe");
+
+		var response = handler.handleNoResourceFound(ex);
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+		assertThat(response.getBody().message()).contains("esto-no-existe");
 	}
 
 	@Test
