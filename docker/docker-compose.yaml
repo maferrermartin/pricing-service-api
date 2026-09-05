@@ -9,9 +9,7 @@ services:
       - "8080:8080"
     restart: unless-stopped
 
-  # Escaneo de vulnerabilidades de la imagen ya construida. No se ejecuta con un
-  # "docker compose up" normal (esta en el profile "scan"): primero se construye la
-  # imagen (docker compose build pricing-service-api) y luego se lanza a demanda con
+  # Vulnerability scanning of the already built image
   # docker compose --profile scan run --rm trivy
   trivy:
     image: aquasec/trivy:0.74.0
