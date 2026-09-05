@@ -1,5 +1,5 @@
 # ---- Build stage ----
-FROM eclipse-temurin:21-jdk AS build
+FROM eclipse-temurin:21-jdk-noble AS build
 WORKDIR /app
 
 COPY gradlew settings.gradle build.gradle ./
@@ -10,7 +10,7 @@ COPY src src
 RUN ./gradlew --no-daemon build
 
 # ---- Runtime stage ----
-FROM eclipse-temurin:21-jre AS runtime
+FROM eclipse-temurin:21-jre-noble AS runtime
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
