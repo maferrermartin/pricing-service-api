@@ -1,0 +1,16 @@
+#!/bin/sh
+# Run the tests before sending the push; if they fail, cancel it.
+
+echo "pre-push: run ./gradlew test before continuing..."
+
+./gradlew test
+status=$?
+
+if [ $status -ne 0 ]; then
+	echo ""
+	echo "pre-push: The tests failed, push cancelled."
+	echo "pre-push: 'git push --no-verify' skip this check (not recommended)."
+	exit 1
+fi
+
+exit 0
