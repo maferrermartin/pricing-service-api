@@ -46,6 +46,7 @@ class PricingModulePerformanceIT {
 
 	@Container
 	@ServiceConnection
+	@SuppressWarnings("unused")
 	static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:16-alpine");
 
 	@Autowired

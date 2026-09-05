@@ -14,6 +14,7 @@ import jakarta.persistence.Table;
 @Entity
 @Table(name = "PRICES", indexes = {
 		@Index(name = "idx_prices_lookup", columnList = "BRAND_ID, PRODUCT_ID, START_DATE, END_DATE") })
+@SuppressWarnings("unused")
 class PriceRateEntity {
 
 	@Id
