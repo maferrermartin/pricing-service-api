@@ -51,6 +51,9 @@ dependencies {
 	// /actuator/health for the Docker/orchestrator healthcheck (own management port)
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
+	// OpenAPI 3 + Swagger UI documentation
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0'
+
 	// In-memory database
 	runtimeOnly 'com.h2database:h2'
 
@@ -61,7 +64,7 @@ dependencies {
 	testImplementation 'org.springframework.modulith:spring-modulith-starter-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
-	// Test de rendimiento del modulo contra una BD real (no H2), levantada en Docker
+	// Performance test
 	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
 	testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
 	testImplementation 'org.testcontainers:testcontainers-postgresql'
