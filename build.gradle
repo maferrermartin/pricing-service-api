@@ -19,11 +19,13 @@ repositories {
 
 ext {
 	set('springModulithVersion', '2.1.1')
+	set('testcontainersVersion', '2.0.5')
 }
 
 dependencyManagement {
 	imports {
 		mavenBom "org.springframework.modulith:spring-modulith-bom:${springModulithVersion}"
+		mavenBom "org.testcontainers:testcontainers-bom:${testcontainersVersion}"
 	}
 
 	dependencies {
@@ -58,6 +60,12 @@ dependencies {
 	testImplementation 'org.springframework.boot:spring-boot-data-jpa-test'
 	testImplementation 'org.springframework.modulith:spring-modulith-starter-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+	// Test de rendimiento del modulo contra una BD real (no H2), levantada en Docker
+	testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+	testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+	testImplementation 'org.testcontainers:testcontainers-postgresql'
+	testImplementation 'org.postgresql:postgresql:42.7.13'
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -65,7 +73,21 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 tasks.named('test') {
-	useJUnitPlatform()
+	useJUnitPlatform {
+		excludeTags 'performance'
+	}
+}
+
+// Test de rendimiento aparte: no debe correr en cada "./gradlew test" (levanta un
+// Postgres real en Docker, es lento para el dia a dia). Se lanza a demanda con
+// "./gradlew performanceTest"
+tasks.register('performanceTest', Test) {
+	useJUnitPlatform {
+		includeTags 'performance'
+	}
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	shouldRunAfter test
 }
 
 tasks.named('jar') {
