@@ -13,6 +13,10 @@ java {
 	}
 }
 
+springBoot {
+	buildInfo()
+}
+
 repositories {
 	mavenCentral()
 }
@@ -50,6 +54,9 @@ dependencies {
 
 	// /actuator/health for the Docker/orchestrator healthcheck (own management port)
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+	// Metrics in Prometheus format (/actuator/prometheus)
+	implementation 'io.micrometer:micrometer-registry-prometheus'
 
 	// OpenAPI 3 + Swagger UI documentation
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.1.0'

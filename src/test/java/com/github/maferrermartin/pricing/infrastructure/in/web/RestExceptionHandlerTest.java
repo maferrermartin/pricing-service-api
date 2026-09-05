@@ -30,6 +30,7 @@ class RestExceptionHandlerTest {
 		var source = new ResourceBundleMessageSource();
 		source.setBasename("messages");
 		source.setDefaultEncoding("UTF-8");
+		source.setFallbackToSystemLocale(false);
 		handler = new RestExceptionHandler(source);
 		LocaleContextHolder.setLocale(Locale.of("es"));
 	}

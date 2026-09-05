@@ -1,3 +1,5 @@
+name: pricing-service-api
+
 services:
   pricing-service-api:
     build:
@@ -25,6 +27,35 @@ services:
       --ignore-unfixed
       --format table
       pricing-service-api:local
+
+  # Local monitoring stack. Does not run with a normal "up"
+  # docker compose --profile monitoring up
+  prometheus:
+    image: prom/prometheus:v3.14.0
+    container_name: pricing-service-api-prometheus
+    profiles: ["monitoring"]
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:13.0.8
+    container_name: pricing-service-api-grafana
+    profiles: ["monitoring"]
+    depends_on:
+      - prometheus
+    environment:
+      # For local use only: anonymous entry as Viewer, no login required
+      # Do not use this way if this were exposed outside the machine itself
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
 
 volumes:
   trivy-cache:
