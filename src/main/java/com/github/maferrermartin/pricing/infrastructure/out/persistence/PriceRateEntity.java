@@ -48,6 +48,18 @@ class PriceRateEntity {
 	protected PriceRateEntity() {
 	}
 
+	PriceRateEntity(Long brandId, LocalDateTime startDate, LocalDateTime endDate, Long priceList,
+			Long productId, Integer priority, BigDecimal price, String currency) {
+		this.brandId = brandId;
+		this.startDate = startDate;
+		this.endDate = endDate;
+		this.priceList = priceList;
+		this.productId = productId;
+		this.priority = priority;
+		this.price = price;
+		this.currency = currency;
+	}
+
 	Long getId() {
 		return id;
 	}
