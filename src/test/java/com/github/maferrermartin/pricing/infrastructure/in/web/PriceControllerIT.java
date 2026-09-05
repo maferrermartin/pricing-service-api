@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -118,6 +119,26 @@ class PriceControllerIT {
 				.param("brandId", "-1")
 				.param("productId", PRODUCT_ID))
 				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void devuelveElMensajeDeErrorEnInglesCuandoElClienteLoPide() throws Exception {
+		mockMvc.perform(get(ENDPOINT)
+				.header(HttpHeaders.ACCEPT_LANGUAGE, "en")
+				.param("applicationDate", "2020-06-14T10:00:00")
+				.param("brandId", BRAND_ID))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message").value("Missing required parameter 'productId'"));
+	}
+
+	@Test
+	void devuelveElMensajeDeErrorEnCastellanoCuandoElIdiomaPedidoNoTieneTraduccion() throws Exception {
+		mockMvc.perform(get(ENDPOINT)
+				.header(HttpHeaders.ACCEPT_LANGUAGE, "fr")
+				.param("applicationDate", "2020-06-14T10:00:00")
+				.param("brandId", BRAND_ID))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message").value("Falta el parámetro obligatorio 'productId'"));
 	}
 
 }
