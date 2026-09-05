@@ -1,0 +1,10 @@
+services:
+  pricing-service-api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: pricing-service-api:local
+    container_name: pricing-service-api
+    ports:
+      - "8080:8080"
+    restart: unless-stopped

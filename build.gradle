@@ -40,6 +40,9 @@ dependencies {
 	// Modulith architecture support: checks boundaries between modules
 	implementation 'org.springframework.modulith:spring-modulith-starter-core'
 
+	// /actuator/health for the Docker/orchestrator healthcheck (own management port)
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
 	// In-memory database
 	runtimeOnly 'com.h2database:h2'
 
@@ -57,4 +60,8 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+tasks.named('jar') {
+	enabled = false
 }

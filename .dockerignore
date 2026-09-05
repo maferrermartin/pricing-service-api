@@ -1,0 +1,9 @@
+.git
+.gitattributes
+.gitignore
+.gradle
+.idea
+build
+*.iml
+HELP.md
+docker
