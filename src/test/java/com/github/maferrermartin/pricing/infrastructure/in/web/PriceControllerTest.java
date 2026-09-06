@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -45,6 +46,7 @@ class PriceControllerTest {
 				.param("brandId", "1")
 				.param("productId", "35455"))
 				.andExpect(status().isOk())
+				.andExpect(header().string("Cache-Control", "max-age=300, public"))
 				.andExpect(jsonPath("$.productId").value(35455))
 				.andExpect(jsonPath("$.brandId").value(1))
 				.andExpect(jsonPath("$.priceList").value(1))
@@ -60,7 +62,8 @@ class PriceControllerTest {
 				.param("applicationDate", "2020-06-13T10:00:00")
 				.param("brandId", "1")
 				.param("productId", "35455"))
-				.andExpect(status().isNotFound());
+				.andExpect(status().isNotFound())
+				.andExpect(header().string("Cache-Control", "no-store"));
 	}
 
 }

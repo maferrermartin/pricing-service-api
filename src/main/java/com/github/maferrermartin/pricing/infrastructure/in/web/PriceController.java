@@ -1,6 +1,7 @@
 package com.github.maferrermartin.pricing.infrastructure.in.web;
 
 import java.time.LocalDateTime;
+import java.util.concurrent.TimeUnit;
 
 import jakarta.validation.constraints.Positive;
 
@@ -12,6 +13,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -26,6 +28,9 @@ import com.github.maferrermartin.pricing.application.port.in.FindApplicablePrice
 @RequestMapping("/api/v1/prices")
 @Validated
 class PriceController {
+
+	private static final CacheControl FOUND_CACHE = CacheControl.maxAge(5, TimeUnit.MINUTES).cachePublic();
+	private static final CacheControl NOT_FOUND_CACHE = CacheControl.noStore();
 
 	private final FindApplicablePriceQuery findApplicablePriceQuery;
 
@@ -54,8 +59,8 @@ class PriceController {
 
 		return findApplicablePriceQuery.find(applicationDate, brandId, productId)
 				.map(PriceResponse::from)
-				.map(ResponseEntity::ok)
-				.orElseGet(() -> ResponseEntity.notFound().build());
+				.map(body -> ResponseEntity.ok().cacheControl(FOUND_CACHE).body(body))
+				.orElseGet(() -> ResponseEntity.notFound().cacheControl(NOT_FOUND_CACHE).build());
 	}
 
 }

@@ -1,8 +1,10 @@
 package com.github.maferrermartin.pricing.infrastructure.in.web;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -139,6 +141,28 @@ class PriceControllerIT {
 				.param("brandId", BRAND_ID))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.message").value("Falta el parámetro obligatorio 'productId'"));
+	}
+
+	@Test
+	void generaUnXRequestIdCuandoElClienteNoMandaUno() throws Exception {
+		mockMvc.perform(get(ENDPOINT)
+				.param("applicationDate", "2020-06-14T10:00:00")
+				.param("brandId", BRAND_ID)
+				.param("productId", PRODUCT_ID))
+				.andExpect(status().isOk())
+				.andExpect(header().exists(RequestIdFilter.REQUEST_ID_HEADER))
+				.andExpect(header().string(RequestIdFilter.REQUEST_ID_HEADER, not("")));
+	}
+
+	@Test
+	void reutilizaElXRequestIdDelCliente() throws Exception {
+		mockMvc.perform(get(ENDPOINT)
+				.header(RequestIdFilter.REQUEST_ID_HEADER, "mi-id-de-correlacion")
+				.param("applicationDate", "2020-06-14T10:00:00")
+				.param("brandId", BRAND_ID)
+				.param("productId", PRODUCT_ID))
+				.andExpect(status().isOk())
+				.andExpect(header().string(RequestIdFilter.REQUEST_ID_HEADER, "mi-id-de-correlacion"));
 	}
 
 }

@@ -1,5 +1,6 @@
 plugins {
 	id 'java'
+	id 'jacoco'
 	id 'org.springframework.boot' version '4.1.1'
 	id 'io.spring.dependency-management' version '1.1.7'
 }
@@ -15,6 +16,10 @@ java {
 
 springBoot {
 	buildInfo()
+}
+
+jacoco {
+	toolVersion = '0.8.15'
 }
 
 repositories {
@@ -86,6 +91,31 @@ tasks.named('test') {
 	useJUnitPlatform {
 		excludeTags 'performance'
 	}
+	finalizedBy tasks.named('jacocoTestReport')
+}
+
+tasks.named('jacocoTestReport') {
+	dependsOn tasks.named('test')
+	reports {
+		xml.required = true
+		html.required = true
+	}
+}
+
+// Minimum coverage threshold
+tasks.named('jacocoTestCoverageVerification') {
+	dependsOn tasks.named('jacocoTestReport')
+	violationRules {
+		rule {
+			limit {
+				minimum = 0.70
+			}
+		}
+	}
+}
+
+tasks.named('check') {
+	dependsOn tasks.named('jacocoTestCoverageVerification')
 }
 
 // Performance test

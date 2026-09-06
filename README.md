@@ -16,8 +16,10 @@ modular verificado con Spring Modulith, sobre Spring Boot 4 / Java 21.
 - [Testing](#testing)
 - [Docker](#docker)
 - [Seguridad de la imagen (Trivy)](#seguridad-de-la-imagen-trivy)
+- [CI/CD](#cicd)
 - [Stack](#stack)
 - [Decisiones de diseño](#decisiones-de-diseño)
+- [Monitorización](#monitorización)
 
 ## Arranque rápido
 
@@ -134,10 +136,10 @@ fuera de su paquete, para reforzar el límite hexagonal.
 - **Base de datos**: H2 en memoria, inicializada con `data.sql` al arrancar
   (`spring.jpa.defer-datasource-initialization=true` para que Hibernate cree el
   esquema antes de insertar).
-- **Actuator en puerto separado** (`management.server.port=8081`), con solo `health`
-  expuesto y sin detalles — nunca se publica en `docker-compose.yaml`, así que
-  `/actuator/health` no es alcanzable desde fuera del contenedor; solo lo consulta el
-  `HEALTHCHECK` del propio `Dockerfile`.
+- **Actuator en puerto separado** (`management.server.port=8081`), con solo
+  `health`, `prometheus` e `info` expuestos y sin detalles — nunca se publica en
+  `docker-compose.yaml`, así que ninguno es alcanzable desde fuera del contenedor;
+  solo el `HEALTHCHECK` del propio `Dockerfile` los consulta desde dentro.
 - **Idioma**: `Accept-Language` con español por defecto (ver siguiente sección).
 
 ## Internacionalización
@@ -167,7 +169,7 @@ Validator y siguen el mismo `Accept-Language` sin configuración extra.
 ./gradlew performanceTest   # rendimiento contra Postgres real en Docker, bajo demanda
 ```
 
-36 tests en 11 clases:
+41 tests en 12 clases:
 
 | Clase                               | Qué cubre                                                              |
 |-------------------------------------|------------------------------------------------------------------------|
@@ -177,10 +179,11 @@ Validator y siguen el mismo `Accept-Language` sin configuración extra.
 | `JpaLoadApplicablePriceAdapterTest` | mapeo entidad → dominio, con el repositorio mockeado                   |
 | `PriceRateJpaRepositoryTest`        | la consulta SQL en sí (`@DataJpaTest`), aislada                        |
 | `PriceRateEntityTest`               | asignación correcta de los argumentos del constructor                  |
-| `PriceControllerTest`               | controlador (`@WebMvcTest`), Optional→200/404, sin BD ni servicio real |
-| `PriceControllerIT`                 | los 5 casos del enunciado + errores + i18n, de extremo a extremo       |
+| `PriceControllerTest`               | controlador (`@WebMvcTest`), Optional→200/404, `Cache-Control`         |
+| `PriceControllerIT`                 | los 5 casos del enunciado + errores + i18n + `X-Request-Id`            |
 | `RestExceptionHandlerTest`          | cada handler de error, en español e inglés                             |
 | `PriceResponseTest`                 | mapeo del DTO de respuesta                                             |
+| `RequestIdFilterTest`               | genera/respeta el `X-Request-Id`, lo mete en el MDC y lo limpia        |
 
 **Test de rendimiento** (`PricingModulePerformanceIT`, tag `performance`, excluido de
 `./gradlew test`): levanta un PostgreSQL real en Docker (vía Testcontainers) con
@@ -189,6 +192,10 @@ fechas deliberados (incluida una combinación con 50 tarifas solapadas el mismo 
 el peor caso para la desambiguación por prioridad). Exige que cada consulta resuelva
 en menos de 200 ms, y verifica que el resultado devuelto sigue siendo el correcto a
 esa escala.
+
+**Cobertura de código** (JaCoCo, plugin nativo de Gradle): `./gradlew check` genera el
+informe (`build/reports/jacoco/test/html/index.html`) y falla si la cobertura de
+líneas baja del 70%.
 
 ## Docker
 
@@ -210,7 +217,28 @@ docker compose -f docker/docker-compose.yaml --profile scan run --rm trivy
 ```
 
 No corre en un `up` normal (perfil `scan`, bajo demanda). Escanea la imagen ya
-construida en busca de CVE `CRITICAL`/`HIGH`.
+construida en busca de CVE `CRITICAL`/`HIGH`. Primera pasada: 3 `CRITICAL` (Tomcat) +
+8 `HIGH` (un binario de la imagen base de Ubuntu) — ambos corregidos, ver
+[Decisiones de diseño](#decisiones-de-diseño).
+
+## CI/CD
+
+**Hook local (`pre-push`)**: se instala solo (tarea Gradle `installGitHooks`,
+enganchada a `test` — cualquiera que clone el repo y ejecute los tests una vez ya lo
+tiene). Corre `./gradlew test` antes de dejar salir un `git push`; si fallan, lo
+cancela. Se puede saltar con `git push --no-verify`, por eso no es la única capa de
+protección.
+
+**GitHub Actions** (`.github/workflows/ci.yml`), en cada push/PR a `master`/`develop`:
+
+| Job            | Qué hace                                                       |
+|----------------|----------------------------------------------------------------|
+| `test`         | `./gradlew test`                                               |
+| `docker-image` | construye la imagen y la escanea con Trivy (`CRITICAL`/`HIGH`) |
+
+La protección real está en la regla de rama de GitHub (status check + PR
+obligatorios) — el hook local es solo comodidad para feedback inmediato, no algo que
+no se pueda saltar.
 
 ## Stack
 
@@ -233,8 +261,26 @@ Java 21 y código explícito.
   son públicas fuera de su paquete; todo lo demás (servicios, adaptadores, entidad,
   repositorio) es interno.
 
-# Monitorización
+## Monitorización
 
-# Propuestas de mejora
+- **Métricas** (`/actuator/prometheus`, formato Prometheus) y **build info**
+  (`/actuator/info`) — mismo puerto aislado 8081 que `health`.
+- **Logs estructurados en JSON** (Elastic Common Schema —
+  `logging.structured.format.console=ecs`), listos para Loki/ELK/CloudWatch sin
+  librería adicional.
+- **Stack local de Prometheus + Grafana** (perfil `monitoring`, no corre en un `up`
+  normal):
+
+```bash
+docker compose -f docker/docker-compose.yaml --profile monitoring up
+```
+
+Prometheus (`http://localhost:9090`) scrapea `pricing-service-api:8081` cada 15s.
+Grafana (`http://localhost:3000`, entrada anónima como Viewer) trae ya provisionados
+el datasource y un dashboard (*Pricing Service API*) con 5 paneles: peticiones/seg,
+latencia p95, errores 5xx, memoria heap de la JVM y conexiones activas de Hikari —
+sin tocar nada a mano tras el `up`.
+
+## Propuestas de mejora
 
 - **Rate Limiting Escalable**: Incorporar un mecanismo de rate limiting (error http 429) para proteger los endpoints. Para poder ser escalable a múltiples réplicas se podría integrar un backend compartido (ej. Redis) o delegar la lógica de limitación a un proxy inverso o API Gateway en la capa de red (ej. Nginx).
