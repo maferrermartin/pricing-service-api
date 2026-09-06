@@ -217,9 +217,7 @@ docker compose -f docker/docker-compose.yaml --profile scan run --rm trivy
 ```
 
 No corre en un `up` normal (perfil `scan`, bajo demanda). Escanea la imagen ya
-construida en busca de CVE `CRITICAL`/`HIGH`. Primera pasada: 3 `CRITICAL` (Tomcat) +
-8 `HIGH` (un binario de la imagen base de Ubuntu) — ambos corregidos, ver
-[Decisiones de diseño](#decisiones-de-diseño).
+construida en busca de CVE `CRITICAL`/`HIGH`.
 
 ## CI/CD
 
