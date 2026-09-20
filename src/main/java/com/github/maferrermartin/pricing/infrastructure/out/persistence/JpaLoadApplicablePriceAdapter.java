@@ -1,10 +1,9 @@
 package com.github.maferrermartin.pricing.infrastructure.out.persistence;
 
-import java.time.LocalDateTime;
 import java.util.Currency;
-import java.util.Optional;
+import java.util.List;
 
-import org.springframework.data.domain.Limit;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
 
 import com.github.maferrermartin.pricing.application.port.out.LoadApplicablePricePort;
@@ -20,12 +19,13 @@ class JpaLoadApplicablePriceAdapter implements LoadApplicablePricePort {
 	}
 
 	@Override
-	public Optional<ApplicablePrice> loadApplicablePrice(LocalDateTime applicationDate, Long brandId, Long productId) {
+	@Cacheable("applicablePriceCandidates")
+	public List<ApplicablePrice> loadApplicableCandidates(Long brandId, Long productId) {
 		return repository
-				.findApplicableOrderedByPriority(brandId, productId, applicationDate, Limit.of(1))
+				.findByBrandIdAndProductId(brandId, productId)
 				.stream()
-				.findFirst()
-				.map(this::toDomain);
+				.map(this::toDomain)
+				.toList();
 	}
 
 	private ApplicablePrice toDomain(PriceRateEntity entity) {
@@ -33,6 +33,7 @@ class JpaLoadApplicablePriceAdapter implements LoadApplicablePricePort {
 				entity.getProductId(),
 				entity.getBrandId(),
 				entity.getPriceList(),
+				entity.getPriority(),
 				entity.getStartDate(),
 				entity.getEndDate(),
 				entity.getPrice(),

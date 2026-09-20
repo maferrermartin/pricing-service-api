@@ -16,6 +16,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -23,6 +24,7 @@ import com.github.maferrermartin.pricing.application.port.in.FindApplicablePrice
 import com.github.maferrermartin.pricing.domain.model.ApplicablePrice;
 
 @WebMvcTest(PriceController.class)
+@TestPropertySource(properties = "pricing.api.price-cache-ttl=10s")
 class PriceControllerTest {
 
 	private static final String ENDPOINT = "/api/v1/prices";
@@ -38,7 +40,7 @@ class PriceControllerTest {
 		var start = LocalDateTime.of(2020, 6, 14, 0, 0);
 		var end = LocalDateTime.of(2020, 12, 31, 23, 59, 59);
 		var applicablePrice = new ApplicablePrice(
-				35455L, 1L, 1L, start, end, new BigDecimal("35.50"), Currency.getInstance("EUR"));
+				35455L, 1L, 1L, 0, start, end, new BigDecimal("35.50"), Currency.getInstance("EUR"));
 		when(findApplicablePriceQuery.find(any(), eq(1L), eq(35455L))).thenReturn(Optional.of(applicablePrice));
 
 		mockMvc.perform(get(ENDPOINT)
@@ -46,7 +48,7 @@ class PriceControllerTest {
 				.param("brandId", "1")
 				.param("productId", "35455"))
 				.andExpect(status().isOk())
-				.andExpect(header().string("Cache-Control", "max-age=300, public"))
+				.andExpect(header().string("Cache-Control", "max-age=10, public"))
 				.andExpect(jsonPath("$.productId").value(35455))
 				.andExpect(jsonPath("$.brandId").value(1))
 				.andExpect(jsonPath("$.priceList").value(1))

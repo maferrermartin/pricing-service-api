@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 
 import com.github.maferrermartin.pricing.application.port.in.FindApplicablePriceQuery;
 import com.github.maferrermartin.pricing.application.port.out.LoadApplicablePricePort;
+import com.github.maferrermartin.pricing.domain.ApplicablePriceSelector;
 import com.github.maferrermartin.pricing.domain.model.ApplicablePrice;
 
 @Service
@@ -20,7 +21,8 @@ class PricingApplicationService implements FindApplicablePriceQuery {
 
 	@Override
 	public Optional<ApplicablePrice> find(LocalDateTime applicationDate, Long brandId, Long productId) {
-		return loadApplicablePricePort.loadApplicablePrice(applicationDate, brandId, productId);
+		var candidates = loadApplicablePricePort.loadApplicableCandidates(brandId, productId);
+		return ApplicablePriceSelector.select(candidates, applicationDate);
 	}
 
 }
