@@ -16,6 +16,8 @@ import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.interceptor.SimpleKey;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.junit.jupiter.Container;
@@ -54,6 +56,9 @@ class PricingModulePerformanceIT {
 
 	@Autowired
 	private JdbcTemplate jdbcTemplate;
+
+	@Autowired
+	private CacheManager cacheManager;
 
 	private long totalRowsSeeded;
 	private Long hotBrandId;
@@ -168,6 +173,39 @@ class PricingModulePerformanceIT {
 					.as("lookup #%d (brandId=%d, productId=%d) contra %d filas", i, brandId, productId, totalRowsSeeded)
 					.isLessThan(PERFORMANCE_THRESHOLD_MILLIS);
 		}
+	}
+
+	@Test
+	void cachedLookupsAreSignificantlyFasterThanUncachedOnesForTheSameBrandAndProduct() {
+		var candidatesCache = cacheManager.getCache("applicablePriceCandidates");
+		var cacheKey = new SimpleKey(hotBrandId, hotProductId);
+		int samples = 5;
+
+		long totalColdNanos = 0;
+		for (int i = 0; i < samples; i++) {
+			candidatesCache.evict(cacheKey);
+			long start = System.nanoTime();
+			findApplicablePriceQuery.find(hotApplicationDate, hotBrandId, hotProductId);
+			totalColdNanos += System.nanoTime() - start;
+		}
+		long avgColdNanos = totalColdNanos / samples;
+
+		findApplicablePriceQuery.find(hotApplicationDate, hotBrandId, hotProductId); // warms the cache
+		long totalWarmNanos = 0;
+		for (int i = 0; i < samples; i++) {
+			// different dates on purpose: the cache is keyed by brand+product only, so this
+			// still has to be a hit even though no single request repeats
+			long start = System.nanoTime();
+			findApplicablePriceQuery.find(hotApplicationDate.plusMinutes(i), hotBrandId, hotProductId);
+			totalWarmNanos += System.nanoTime() - start;
+		}
+		long avgWarmNanos = totalWarmNanos / samples;
+
+		assertThat(avgWarmNanos)
+				.as("media de %d lecturas con cache caliente (%.2f ms) frente a %d sin cache (%.2f ms), brandId=%d/productId=%d con %d candidatas",
+						samples, avgWarmNanos / 1_000_000.0, samples, avgColdNanos / 1_000_000.0,
+						hotBrandId, hotProductId, HOT_COMBINATION_ROW_COUNT)
+				.isLessThan(avgColdNanos / 2);
 	}
 
 }

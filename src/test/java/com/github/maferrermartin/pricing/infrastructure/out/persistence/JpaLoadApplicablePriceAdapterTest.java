@@ -13,7 +13,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Limit;
 
 import com.github.maferrermartin.pricing.domain.model.ApplicablePrice;
 
@@ -22,7 +21,6 @@ class JpaLoadApplicablePriceAdapterTest {
 
 	private static final Long BRAND_ID = 1L;
 	private static final Long PRODUCT_ID = 35455L;
-	private static final LocalDateTime APPLICATION_DATE = LocalDateTime.of(2020, 6, 14, 16, 0);
 
 	@Mock
 	private PriceRateJpaRepository repository;
@@ -35,25 +33,27 @@ class JpaLoadApplicablePriceAdapterTest {
 	}
 
 	@Test
-	void mapsTheEntityReturnedByTheRepositoryToTheDomainValueObject() {
+	void mapsEveryEntityOfTheProductAndBrandToADomainValueObject() {
 		var start = LocalDateTime.of(2020, 6, 14, 15, 0);
 		var end = LocalDateTime.of(2020, 6, 14, 18, 30);
-		var entity = new PriceRateEntity(BRAND_ID, start, end, 2L, PRODUCT_ID, 1, new BigDecimal("25.45"), "EUR");
-		when(repository.findApplicableOrderedByPriority(BRAND_ID, PRODUCT_ID, APPLICATION_DATE, Limit.of(1)))
-				.thenReturn(List.of(entity));
+		var overlapping = new PriceRateEntity(BRAND_ID, start, end, 2L, PRODUCT_ID, 1, new BigDecimal("25.45"), "EUR");
+		var base = new PriceRateEntity(BRAND_ID, start, end, 1L, PRODUCT_ID, 0, new BigDecimal("35.50"), "EUR");
+		when(repository.findByBrandIdAndProductId(BRAND_ID, PRODUCT_ID))
+				.thenReturn(List.of(overlapping, base));
 
-		var result = adapter.loadApplicablePrice(APPLICATION_DATE, BRAND_ID, PRODUCT_ID);
+		var result = adapter.loadApplicableCandidates(BRAND_ID, PRODUCT_ID);
 
-		assertThat(result).contains(new ApplicablePrice(
-				PRODUCT_ID, BRAND_ID, 2L, start, end, new BigDecimal("25.45"), Currency.getInstance("EUR")));
+		assertThat(result).containsExactly(
+				new ApplicablePrice(PRODUCT_ID, BRAND_ID, 2L, 1, start, end, new BigDecimal("25.45"), Currency.getInstance("EUR")),
+				new ApplicablePrice(PRODUCT_ID, BRAND_ID, 1L, 0, start, end, new BigDecimal("35.50"), Currency.getInstance("EUR")));
 	}
 
 	@Test
-	void returnsEmptyWhenTheRepositoryFindsNoCandidate() {
-		when(repository.findApplicableOrderedByPriority(BRAND_ID, PRODUCT_ID, APPLICATION_DATE, Limit.of(1)))
+	void returnsAnEmptyListWhenTheRepositoryFindsNoCandidate() {
+		when(repository.findByBrandIdAndProductId(BRAND_ID, PRODUCT_ID))
 				.thenReturn(List.of());
 
-		var result = adapter.loadApplicablePrice(APPLICATION_DATE, BRAND_ID, PRODUCT_ID);
+		var result = adapter.loadApplicableCandidates(BRAND_ID, PRODUCT_ID);
 
 		assertThat(result).isEmpty();
 	}

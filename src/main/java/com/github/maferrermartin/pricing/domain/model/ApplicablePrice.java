@@ -8,6 +8,7 @@ public record ApplicablePrice(
 		Long productId,
 		Long brandId,
 		Long priceList,
+		Integer priority,
 		LocalDateTime startDate,
 		LocalDateTime endDate,
 		BigDecimal price,
