@@ -16,6 +16,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -23,6 +24,7 @@ import com.github.maferrermartin.pricing.application.port.in.FindApplicablePrice
 import com.github.maferrermartin.pricing.domain.model.ApplicablePrice;
 
 @WebMvcTest(PriceController.class)
+@TestPropertySource(properties = "pricing.api.price-cache-ttl=10s")
 class PriceControllerTest {
 
 	private static final String ENDPOINT = "/api/v1/prices";
@@ -46,7 +48,7 @@ class PriceControllerTest {
 				.param("brandId", "1")
 				.param("productId", "35455"))
 				.andExpect(status().isOk())
-				.andExpect(header().string("Cache-Control", "max-age=300, public"))
+				.andExpect(header().string("Cache-Control", "max-age=10, public"))
 				.andExpect(jsonPath("$.productId").value(35455))
 				.andExpect(jsonPath("$.brandId").value(1))
 				.andExpect(jsonPath("$.priceList").value(1))
