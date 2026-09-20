@@ -12,6 +12,7 @@ modular verificado con Spring Modulith, sobre Spring Boot 4 / Java 21.
 - [Documentación interactiva (OpenAPI / Swagger)](#documentación-interactiva-openapi--swagger)
 - [Arquitectura](#arquitectura)
 - [Configuración](#configuración)
+- [Caché](#caché)
 - [Internacionalización](#internacionalización)
 - [Testing](#testing)
 - [Docker](#docker)
@@ -107,7 +108,7 @@ com.github.maferrermartin
     ├── domain
     │   ├── model
     │   │   └── ApplicablePrice                ← value object del dominio
-    │   └── ApplicablePriceSelector             ← regla de negocio: desempate por prioridad
+    │   └── ApplicablePriceSelector             ← reglas de negocio: cobertura de fecha + prioridad
     ├── application
     │   ├── port.in
     │   │   └── FindApplicablePriceQuery        ← caso de uso (puerto de entrada)
@@ -123,7 +124,8 @@ com.github.maferrermartin
         └── out.persistence                    ← adaptador JPA/H2
             ├── PriceRateEntity
             ├── PriceRateJpaRepository
-            └── JpaLoadApplicablePriceAdapter
+            ├── JpaLoadApplicablePriceAdapter    ← cacheado por brandId+productId
+            └── CacheConfig
 ```
 
 Todas las clases de implementación (servicio de aplicación, adaptadores, entidad,
@@ -142,6 +144,34 @@ fuera de su paquete, para reforzar el límite hexagonal.
   `docker-compose.yaml`, así que ninguno es alcanzable desde fuera del contenedor;
   solo el `HEALTHCHECK` del propio `Dockerfile` los consulta desde dentro.
 - **Idioma**: `Accept-Language` con español por defecto (ver siguiente sección).
+
+## Caché
+
+`JpaLoadApplicablePriceAdapter.loadApplicableCandidates(brandId, productId)` está anotado
+con `@Cacheable("applicablePriceCandidates")`: cachea, por marca+producto (sin fecha), el
+histórico completo de tarifas de esa combinación. El filtrado por `applicationDate` y el
+desempate por prioridad se resuelven después, en memoria, sobre esa lista ya cacheada
+(`ApplicablePriceSelector`) — así cualquier fecha para ese mismo producto se beneficia del
+mismo hit de caché, no solo las peticiones que repiten la fecha exacta.
+
+- **Tecnología**: Caffeine en proceso (`spring.cache.type=caffeine`), no Redis. No hay hoy
+  necesidad de una caché compartida entre réplicas — las tarifas cambian con poca
+  frecuencia, así que cada instancia resolviendo su propio primer *miss* es un coste
+  asumible, y evita añadir una pieza de infraestructura nueva.
+- **Caducidad**: `expireAfterWrite=5m` (`application.properties`), la misma ventana que el
+  `Cache-Control: max-age=300` que ya devuelve `PriceController` — una única política de
+  caducidad, no dos desconectadas entre sí.
+- **Caso "no encontrado" también se cachea**: el método nunca devuelve `null` (lista vacía
+  en el peor caso), así que una combinación de marca/producto inexistente tampoco repite
+  la consulta a BD en cada intento.
+- **Métricas**: gratis vía Micrometer en cuanto detecta el `CacheManager` (hit ratio,
+  tamaño, evictions), expuestas junto al resto en `/actuator/prometheus`.
+
+La mejora se demuestra con una medición real, no solo comprobando que el mecanismo está
+activo: `PricingModulePerformanceIT.cachedLookupsAreSignificantlyFasterThanUncachedOnesForTheSameBrandAndProduct()`
+compara, contra Postgres real, la media de varias lecturas con caché fría frente a la
+misma combinación con caché caliente (fechas distintas cada vez, a propósito) y exige que
+la caliente sea menos de la mitad de la fría.
 
 ## Internacionalización
 
@@ -170,22 +200,23 @@ Validator y siguen el mismo `Accept-Language` sin configuración extra.
 ./gradlew performanceTest   # rendimiento contra Postgres real en Docker, bajo demanda
 ```
 
-46 tests en 13 clases:
+53 tests en 14 clases:
 
-| Clase                               | Qué cubre                                                       |
-|-------------------------------------|-----------------------------------------------------------------|
-| `ModularityTests`                   | límites del módulo (`ApplicationModules.verify()`)              |
-| `ApplicablePriceSelectorTest`       | regla de desempate por prioridad                                |
-| `PricingApplicationServiceTest`     | servicio de aplicación, con el puerto de salida mockeado        |
-| `PricingApplicationServiceIT`       | servicio + persistencia real (H2), casos del enunciado          |
-| `JpaLoadApplicablePriceAdapterTest` | mapeo entidad → dominio, con el repositorio mockeado            |
-| `PriceRateJpaRepositoryTest`        | la consulta SQL en sí (`@DataJpaTest`), aislada                 |
-| `PriceRateEntityTest`               | asignación correcta de los argumentos del constructor           |
-| `PriceControllerTest`               | controlador (`@WebMvcTest`), Optional→200/404, `Cache-Control`  |
-| `PriceControllerIT`                 | los 5 casos del enunciado + errores + i18n + `X-Request-Id`     |
-| `RestExceptionHandlerTest`          | cada handler de error, en español e inglés                      |
-| `PriceResponseTest`                 | mapeo del DTO de respuesta                                      |
-| `RequestIdFilterTest`               | genera/respeta el `X-Request-Id`, lo mete en el MDC y lo limpia |
+| Clase                                     | Qué cubre                                                       |
+|--------------------------------------------|-----------------------------------------------------------------|
+| `ModularityTests`                         | límites del módulo (`ApplicationModules.verify()`)              |
+| `ApplicablePriceSelectorTest`             | cobertura de fecha (límites incluidos) + desempate por prioridad |
+| `PricingApplicationServiceTest`           | servicio de aplicación, con el puerto de salida mockeado        |
+| `PricingApplicationServiceIT`             | servicio + persistencia real (H2), casos del enunciado          |
+| `JpaLoadApplicablePriceAdapterTest`       | mapeo entidad → dominio, con el repositorio mockeado            |
+| `JpaLoadApplicablePriceAdapterCachingIT`  | la caché no repite la consulta para la misma marca/producto     |
+| `PriceRateJpaRepositoryTest`              | la consulta derivada (`@DataJpaTest`), aislada                  |
+| `PriceRateEntityTest`                     | asignación correcta de los argumentos del constructor           |
+| `PriceControllerTest`                     | controlador (`@WebMvcTest`), Optional→200/404, `Cache-Control`  |
+| `PriceControllerIT`                       | los 5 casos del enunciado + errores + i18n + `X-Request-Id`     |
+| `RestExceptionHandlerTest`                | cada handler de error, en español e inglés                      |
+| `PriceResponseTest`                       | mapeo del DTO de respuesta                                      |
+| `RequestIdFilterTest`                     | genera/respeta el `X-Request-Id`, lo mete en el MDC y lo limpia |
 
 **Test de rendimiento** (`PricingModulePerformanceIT`, tag `performance`, excluido de
 `./gradlew test`): levanta un PostgreSQL real en Docker (vía Testcontainers) con
@@ -193,7 +224,8 @@ Validator y siguen el mismo `Accept-Language` sin configuración extra.
 fechas deliberados (incluida una combinación con 50 tarifas solapadas el mismo día,
 el peor caso para la desambiguación por prioridad). Exige que cada consulta resuelva
 en menos de 200 ms, y verifica que el resultado devuelto sigue siendo el correcto a
-esa escala.
+esa escala. Incluye además una comparación real de caché fría vs. caliente (ver
+[Caché](#caché)), con la misma infraestructura de datos.
 
 **Cobertura de código** (JaCoCo, plugin nativo de Gradle): `./gradlew check` genera el
 informe (`build/reports/jacoco/test/html/index.html`) y falla si la cobertura de
@@ -242,21 +274,22 @@ no se pueda saltar.
 
 ## Stack
 
-Spring Boot 4.1 (Web, Data JPA, Validation, Actuator), Spring Modulith, H2,
-springdoc-openapi, JUnit 5 + Mockito + AssertJ, Testcontainers (PostgreSQL), Docker,
-Trivy. Sin librerías de utilidad de terceros (Lombok, MapStruct...) — records de
+Spring Boot 4.1 (Web, Data JPA, Validation, Actuator, Cache), Spring Modulith, H2,
+Caffeine, springdoc-openapi, JUnit 5 + Mockito + AssertJ, Testcontainers (PostgreSQL),
+Docker, Trivy. Sin librerías de utilidad de terceros (Lombok, MapStruct...) — records de
 Java 21 y código explícito.
 
 ## Decisiones de diseño
 
 - **Sin entidades de dominio ricas**: es un endpoint de solo lectura sin invariantes
   que proteger; forzar Entities/Value Objects con comportamiento sería sobre-ingeniería.
-- **Filtrado en SQL, desempate en el dominio**: la consulta JPA solo filtra por
-  `brandId`/`productId`/rango de fechas; decidir cuál de las candidatas solapadas gana por prioridad 
-  es una regla de negocio y vive en `ApplicablePriceSelector` (dominio puro, sin Spring ni JPA), 
-  no en el `ORDER BY`/`LIMIT` de la query. Así la regla es testeable de forma aislada y no queda implícita en el
-  contrato del puerto de salida — cualquier adaptador nuevo (caché, otro motor, un
-  servicio externo) hereda la regla sin tener que reimplementarla.
+- **Filtrado en SQL solo por marca/producto; fecha y prioridad en el dominio**: la consulta
+  JPA (`findByBrandIdAndProductId`) ya no filtra por fecha — decidir qué candidata cubre la
+  fecha pedida y cuál gana por prioridad son reglas de negocio y viven en
+  `ApplicablePriceSelector` (dominio puro, sin Spring ni JPA), no en el `WHERE`/`ORDER BY`
+  de la query. Así las reglas son testeables de forma aislada, no quedan implícitas en el
+  contrato del puerto de salida, y de paso permiten cachear por marca+producto (ver
+  [Caché](#caché)) sin que la fecha rompa el acierto de caché.
 - **"No encontrado" no es una excepción**: `Optional<ApplicablePrice>` vacío es un
   resultado válido de una consulta, no un caso excepcional; el adaptador web decide
   que eso significa 404, no el dominio.

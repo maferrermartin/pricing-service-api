@@ -51,6 +51,10 @@ dependencies {
 	// Persistence: repository port output adapter (Hibernate + HikariCP)
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 
+	// In-process cache (Caffeine) for the output port, keyed by brand+product
+	implementation 'org.springframework.boot:spring-boot-starter-cache'
+	implementation 'com.github.ben-manes.caffeine:caffeine'
+
 	// Endpoint input parameter validation (Bean Validation)
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 

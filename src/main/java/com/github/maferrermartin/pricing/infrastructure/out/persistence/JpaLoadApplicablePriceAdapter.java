@@ -1,9 +1,9 @@
 package com.github.maferrermartin.pricing.infrastructure.out.persistence;
 
-import java.time.LocalDateTime;
 import java.util.Currency;
 import java.util.List;
 
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
 
 import com.github.maferrermartin.pricing.application.port.out.LoadApplicablePricePort;
@@ -19,9 +19,10 @@ class JpaLoadApplicablePriceAdapter implements LoadApplicablePricePort {
 	}
 
 	@Override
-	public List<ApplicablePrice> loadApplicableCandidates(LocalDateTime applicationDate, Long brandId, Long productId) {
+	@Cacheable("applicablePriceCandidates")
+	public List<ApplicablePrice> loadApplicableCandidates(Long brandId, Long productId) {
 		return repository
-				.findApplicable(brandId, productId, applicationDate)
+				.findByBrandIdAndProductId(brandId, productId)
 				.stream()
 				.map(this::toDomain)
 				.toList();

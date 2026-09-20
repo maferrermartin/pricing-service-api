@@ -36,20 +36,20 @@ class PricingApplicationServiceTest {
 	}
 
 	@Test
-	void asksThePortForCandidatesWithTheSameArguments() {
-		when(loadApplicablePricePort.loadApplicableCandidates(APPLICATION_DATE, BRAND_ID, PRODUCT_ID))
+	void asksThePortForCandidatesByBrandAndProductOnly() {
+		when(loadApplicablePricePort.loadApplicableCandidates(BRAND_ID, PRODUCT_ID))
 				.thenReturn(List.of());
 
 		service.find(APPLICATION_DATE, BRAND_ID, PRODUCT_ID);
 
-		verify(loadApplicablePricePort).loadApplicableCandidates(APPLICATION_DATE, BRAND_ID, PRODUCT_ID);
+		verify(loadApplicablePricePort).loadApplicableCandidates(BRAND_ID, PRODUCT_ID);
 	}
 
 	@Test
-	void returnsTheHighestPriorityCandidateWhenSeveralOverlap() {
+	void returnsTheHighestPriorityCandidateThatCoversTheApplicationDate() {
 		var basePrice = candidateWith(1L, 0, new BigDecimal("35.50"));
 		var higherPriority = candidateWith(2L, 1, new BigDecimal("25.45"));
-		when(loadApplicablePricePort.loadApplicableCandidates(APPLICATION_DATE, BRAND_ID, PRODUCT_ID))
+		when(loadApplicablePricePort.loadApplicableCandidates(BRAND_ID, PRODUCT_ID))
 				.thenReturn(List.of(basePrice, higherPriority));
 
 		var result = service.find(APPLICATION_DATE, BRAND_ID, PRODUCT_ID);
@@ -58,8 +58,19 @@ class PricingApplicationServiceTest {
 	}
 
 	@Test
+	void returnsEmptyWhenNoCandidateCoversTheApplicationDate() {
+		var expired = candidateWith(1L, 0, new BigDecimal("35.50"), APPLICATION_DATE.minusDays(2), APPLICATION_DATE.minusDays(1));
+		when(loadApplicablePricePort.loadApplicableCandidates(BRAND_ID, PRODUCT_ID))
+				.thenReturn(List.of(expired));
+
+		var result = service.find(APPLICATION_DATE, BRAND_ID, PRODUCT_ID);
+
+		assertThat(result).isEmpty();
+	}
+
+	@Test
 	void returnsEmptyWhenThePortFindsNoCandidate() {
-		when(loadApplicablePricePort.loadApplicableCandidates(APPLICATION_DATE, BRAND_ID, PRODUCT_ID))
+		when(loadApplicablePricePort.loadApplicableCandidates(BRAND_ID, PRODUCT_ID))
 				.thenReturn(List.of());
 
 		var result = service.find(APPLICATION_DATE, BRAND_ID, PRODUCT_ID);
@@ -68,8 +79,12 @@ class PricingApplicationServiceTest {
 	}
 
 	private ApplicablePrice candidateWith(Long priceList, int priority, BigDecimal price) {
-		return new ApplicablePrice(PRODUCT_ID, BRAND_ID, priceList, priority,
-				APPLICATION_DATE, APPLICATION_DATE.plusDays(1), price, Currency.getInstance("EUR"));
+		return candidateWith(priceList, priority, price, APPLICATION_DATE, APPLICATION_DATE.plusDays(1));
+	}
+
+	private ApplicablePrice candidateWith(Long priceList, int priority, BigDecimal price,
+			LocalDateTime start, LocalDateTime end) {
+		return new ApplicablePrice(PRODUCT_ID, BRAND_ID, priceList, priority, start, end, price, Currency.getInstance("EUR"));
 	}
 
 }

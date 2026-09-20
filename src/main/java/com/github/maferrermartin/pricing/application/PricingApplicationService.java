@@ -21,8 +21,8 @@ class PricingApplicationService implements FindApplicablePriceQuery {
 
 	@Override
 	public Optional<ApplicablePrice> find(LocalDateTime applicationDate, Long brandId, Long productId) {
-		var candidates = loadApplicablePricePort.loadApplicableCandidates(applicationDate, brandId, productId);
-		return ApplicablePriceSelector.highestPriority(candidates);
+		var candidates = loadApplicablePricePort.loadApplicableCandidates(brandId, productId);
+		return ApplicablePriceSelector.select(candidates, applicationDate);
 	}
 
 }
