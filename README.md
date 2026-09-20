@@ -81,6 +81,13 @@ curl "http://localhost:8080/api/v1/prices?applicationDate=2020-06-14T16:00:00&br
 | Ruta inexistente                                          | `404 Not Found`                                                       |
 | Error no controlado                                       | `500 Internal Server Error` (mensaje genérico, sin detalles internos) |
 
+**Cabeceras de respuesta:**
+
+| Cabecera         | En qué respuestas | Para qué sirve                                                                          |
+|-------------------|--------------------|-------------------------------------------------------------------------------------------|
+| `Cache-Control`   | Todas              | `max-age=<TTL>, public` cuando hay tarifa (ver [Caché](#caché)); `no-store` en el 404     |
+| `X-Request-Id`    | Todas              | Correlación de peticiones: el cliente puede mandarla y se respeta, o se genera si falta; el mismo valor queda en los logs JSON de esa petición (`RequestIdFilter`) |
+
 Los mensajes de error siguen la cabecera `Accept-Language` del cliente (ver
 [Internacionalización](#internacionalización)).
 
@@ -139,6 +146,18 @@ fuera de su paquete, para reforzar el límite hexagonal.
 - **Base de datos**: H2 en memoria, inicializada con `data.sql` al arrancar
   (`spring.jpa.defer-datasource-initialization=true` para que Hibernate cree el
   esquema antes de insertar).
+- **Consola H2** (`spring.h2.console.enabled=true`, en `/h2-console`) — a diferencia del
+  actuator, vive en el puerto principal (8080), el mismo que `docker-compose.yaml` sí
+  publica al exterior. Asumible aquí porque la BD es en memoria y se resetea en cada
+  arranque, pero es lo primero a desactivar (`spring.h2.console.enabled=false`) si esta
+  configuración se usara alguna vez detrás de una base de datos real.
+  Requiere la dependencia `org.springframework.boot:spring-boot-h2console` en
+  `build.gradle`: Spring Boot 4 partió el antiguo `spring-boot-autoconfigure` monolítico
+  en módulos pequeños por funcionalidad, y la auto-configuración de la consola quedó en
+  uno propio que ya no se arrastra solo por tener el driver de H2 — sin esa dependencia
+  la propiedad no tiene ningún efecto (`/h2-console` responde 404, no hay ningún aviso ni
+  error de arranque). Verificado con `H2ConsoleIT` (arranca la app real en el 8080 y
+  comprueba que `/h2-console` redirige y sirve la página).
 - **Actuator en puerto separado** (`management.server.port=8081`), con solo
   `health`, `prometheus` e `info` expuestos y sin detalles — nunca se publica en
   `docker-compose.yaml`, así que ninguno es alcanzable desde fuera del contenedor;
@@ -162,8 +181,7 @@ mismo hit de caché, no solo las peticiones que repiten la fecha exacta.
   asumible, y evita añadir una pieza de infraestructura nueva.
 - **Caducidad**: `expireAfterWrite=5m` (`application.properties`), la misma ventana que
   `pricing.api.price-cache-ttl` (el `Cache-Control` HTTP de `PriceController`, ver
-  [Configuración](#configuración)) — una única política de caducidad, no dos
-  desconectadas entre sí, y ninguna hardcodeada en código.
+  [Configuración](#configuración)) — una única política de caducidad.
 - **Caso "no encontrado" también se cachea**: el método nunca devuelve `null` (lista vacía
   en el peor caso), así que una combinación de marca/producto inexistente tampoco repite
   la consulta a BD en cada intento.
@@ -203,24 +221,25 @@ Validator y siguen el mismo `Accept-Language` sin configuración extra.
 ./gradlew performanceTest   # rendimiento contra Postgres real en Docker, bajo demanda
 ```
 
-59 tests en 15 clases:
+60 tests en 16 clases:
 
-| Clase                                     | Qué cubre                                                       |
-|--------------------------------------------|-----------------------------------------------------------------|
-| `ModularityTests`                         | límites del módulo (`ApplicationModules.verify()`)              |
-| `ApplicablePriceSelectorTest`             | cobertura de fecha (límites incluidos) + desempate por prioridad |
-| `PricingApplicationServiceTest`           | servicio de aplicación, con el puerto de salida mockeado        |
-| `PricingApplicationServiceIT`             | servicio + persistencia real (H2), casos del enunciado          |
-| `JpaLoadApplicablePriceAdapterTest`       | mapeo entidad → dominio, con el repositorio mockeado            |
-| `JpaLoadApplicablePriceAdapterCachingIT`  | la caché no repite la consulta para la misma marca/producto     |
-| `PriceRateJpaRepositoryTest`              | la consulta derivada (`@DataJpaTest`), aislada                  |
-| `PriceRateEntityTest`                     | asignación correcta de los argumentos del constructor           |
-| `PriceControllerTest`                     | controlador (`@WebMvcTest`), Optional→200/404, `Cache-Control` (TTL configurado) |
-| `PriceControllerIT`                       | los 5 casos del enunciado + errores + i18n + `X-Request-Id`     |
-| `RestExceptionHandlerTest`                | cada handler de error, en español e inglés                      |
-| `PriceResponseTest`                       | mapeo del DTO de respuesta                                      |
-| `RequestIdFilterTest`                     | genera/respeta el `X-Request-Id`, lo mete en el MDC y lo limpia |
-| `OpenApiConfigTest`                       | traducción de la spec OpenAPI (info + propiedades de schema), casos límite |
+| Clase                                    | Qué cubre                                                                        |
+|------------------------------------------|----------------------------------------------------------------------------------|
+| `ModularityTests`                        | límites del módulo (`ApplicationModules.verify()`)                               |
+| `H2ConsoleIT`                            | `/h2-console` responde con la app real en el puerto 8080                         |
+| `ApplicablePriceSelectorTest`            | cobertura de fecha (límites incluidos) + desempate por prioridad                 |
+| `PricingApplicationServiceTest`          | servicio de aplicación, con el puerto de salida mockeado                         |
+| `PricingApplicationServiceIT`            | servicio + persistencia real (H2), casos del enunciado                           |
+| `JpaLoadApplicablePriceAdapterTest`      | mapeo entidad → dominio, con el repositorio mockeado                             |
+| `JpaLoadApplicablePriceAdapterCachingIT` | la caché no repite la consulta para la misma marca/producto                      |
+| `PriceRateJpaRepositoryTest`             | la consulta derivada (`@DataJpaTest`), aislada                                   |
+| `PriceRateEntityTest`                    | asignación correcta de los argumentos del constructor                            |
+| `PriceControllerTest`                    | controlador (`@WebMvcTest`), Optional→200/404, `Cache-Control` (TTL configurado) |
+| `PriceControllerIT`                      | los 5 casos del enunciado + errores + i18n + `X-Request-Id`                      |
+| `RestExceptionHandlerTest`               | cada handler de error, en español e inglés                                       |
+| `PriceResponseTest`                      | mapeo del DTO de respuesta                                                       |
+| `RequestIdFilterTest`                    | genera/respeta el `X-Request-Id`, lo mete en el MDC y lo limpia                  |
+| `OpenApiConfigTest`                      | traducción de la spec OpenAPI (info + propiedades de schema), casos límite       |
 
 **Test de rendimiento** (`PricingModulePerformanceIT`, tag `performance`, excluido de
 `./gradlew test`): levanta un PostgreSQL real en Docker (vía Testcontainers) con
