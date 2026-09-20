@@ -1,13 +1,13 @@
 package com.github.maferrermartin.pricing.infrastructure.out.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import java.time.LocalDateTime;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
-import org.springframework.data.domain.Limit;
 
 @DataJpaTest
 class PriceRateJpaRepositoryTest {
@@ -19,27 +19,27 @@ class PriceRateJpaRepositoryTest {
 	private PriceRateJpaRepository repository;
 
 	@Test
-	void picksTheHighestPriorityCandidateWhenRangesOverlap() {
-		var candidates = repository.findApplicableOrderedByPriority(
-				BRAND_ID, PRODUCT_ID, LocalDateTime.of(2020, 6, 14, 16, 0), Limit.of(1));
+	void returnsEveryCandidateWhoseRangeCoversTheDateIncludingOverlappingOnes() {
+		var candidates = repository.findApplicable(
+				BRAND_ID, PRODUCT_ID, LocalDateTime.of(2020, 6, 14, 16, 0));
 
-		assertThat(candidates).hasSize(1);
-		assertThat(candidates.getFirst().getPriceList()).isEqualTo(2L);
+		assertThat(candidates)
+				.extracting(PriceRateEntity::getPriceList, PriceRateEntity::getPriority)
+				.containsExactlyInAnyOrder(tuple(1L, 0), tuple(2L, 1));
 	}
 
 	@Test
-	void fallsBackToTheBaseRateWhenTheOverlappingWindowHasEnded() {
-		var candidates = repository.findApplicableOrderedByPriority(
-				BRAND_ID, PRODUCT_ID, LocalDateTime.of(2020, 6, 14, 21, 0), Limit.of(1));
+	void returnsOnlyTheBaseRateWhenTheOverlappingWindowHasEnded() {
+		var candidates = repository.findApplicable(
+				BRAND_ID, PRODUCT_ID, LocalDateTime.of(2020, 6, 14, 21, 0));
 
-		assertThat(candidates).hasSize(1);
-		assertThat(candidates.getFirst().getPriceList()).isEqualTo(1L);
+		assertThat(candidates).extracting(PriceRateEntity::getPriceList).containsExactly(1L);
 	}
 
 	@Test
 	void returnsNoCandidatesWhenNoRangeCoversTheDate() {
-		var candidates = repository.findApplicableOrderedByPriority(
-				BRAND_ID, PRODUCT_ID, LocalDateTime.of(2020, 6, 13, 10, 0), Limit.of(1));
+		var candidates = repository.findApplicable(
+				BRAND_ID, PRODUCT_ID, LocalDateTime.of(2020, 6, 13, 10, 0));
 
 		assertThat(candidates).isEmpty();
 	}

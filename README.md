@@ -105,8 +105,9 @@ com.github.maferrermartin
 ├── MaferrermartinApplication
 └── pricing                                    ← único módulo de aplicación
     ├── domain
-    │   └── model
-    │       └── ApplicablePrice                ← value object del dominio
+    │   ├── model
+    │   │   └── ApplicablePrice                ← value object del dominio
+    │   └── ApplicablePriceSelector             ← regla de negocio: desempate por prioridad
     ├── application
     │   ├── port.in
     │   │   └── FindApplicablePriceQuery        ← caso de uso (puerto de entrada)
@@ -169,21 +170,22 @@ Validator y siguen el mismo `Accept-Language` sin configuración extra.
 ./gradlew performanceTest   # rendimiento contra Postgres real en Docker, bajo demanda
 ```
 
-41 tests en 12 clases:
+46 tests en 13 clases:
 
-| Clase                               | Qué cubre                                                              |
-|-------------------------------------|------------------------------------------------------------------------|
-| `ModularityTests`                   | límites del módulo (`ApplicationModules.verify()`)                     |
-| `PricingApplicationServiceTest`     | servicio de aplicación, con el puerto de salida mockeado               |
-| `PricingApplicationServiceIT`       | servicio + persistencia real (H2), casos del enunciado                 |
-| `JpaLoadApplicablePriceAdapterTest` | mapeo entidad → dominio, con el repositorio mockeado                   |
-| `PriceRateJpaRepositoryTest`        | la consulta SQL en sí (`@DataJpaTest`), aislada                        |
-| `PriceRateEntityTest`               | asignación correcta de los argumentos del constructor                  |
-| `PriceControllerTest`               | controlador (`@WebMvcTest`), Optional→200/404, `Cache-Control`         |
-| `PriceControllerIT`                 | los 5 casos del enunciado + errores + i18n + `X-Request-Id`            |
-| `RestExceptionHandlerTest`          | cada handler de error, en español e inglés                             |
-| `PriceResponseTest`                 | mapeo del DTO de respuesta                                             |
-| `RequestIdFilterTest`               | genera/respeta el `X-Request-Id`, lo mete en el MDC y lo limpia        |
+| Clase                               | Qué cubre                                                       |
+|-------------------------------------|-----------------------------------------------------------------|
+| `ModularityTests`                   | límites del módulo (`ApplicationModules.verify()`)              |
+| `ApplicablePriceSelectorTest`       | regla de desempate por prioridad                                |
+| `PricingApplicationServiceTest`     | servicio de aplicación, con el puerto de salida mockeado        |
+| `PricingApplicationServiceIT`       | servicio + persistencia real (H2), casos del enunciado          |
+| `JpaLoadApplicablePriceAdapterTest` | mapeo entidad → dominio, con el repositorio mockeado            |
+| `PriceRateJpaRepositoryTest`        | la consulta SQL en sí (`@DataJpaTest`), aislada                 |
+| `PriceRateEntityTest`               | asignación correcta de los argumentos del constructor           |
+| `PriceControllerTest`               | controlador (`@WebMvcTest`), Optional→200/404, `Cache-Control`  |
+| `PriceControllerIT`                 | los 5 casos del enunciado + errores + i18n + `X-Request-Id`     |
+| `RestExceptionHandlerTest`          | cada handler de error, en español e inglés                      |
+| `PriceResponseTest`                 | mapeo del DTO de respuesta                                      |
+| `RequestIdFilterTest`               | genera/respeta el `X-Request-Id`, lo mete en el MDC y lo limpia |
 
 **Test de rendimiento** (`PricingModulePerformanceIT`, tag `performance`, excluido de
 `./gradlew test`): levanta un PostgreSQL real en Docker (vía Testcontainers) con
@@ -249,8 +251,12 @@ Java 21 y código explícito.
 
 - **Sin entidades de dominio ricas**: es un endpoint de solo lectura sin invariantes
   que proteger; forzar Entities/Value Objects con comportamiento sería sobre-ingeniería.
-- **Prioridad resuelta en SQL, no en Java**: `ORDER BY priority DESC` + `LIMIT` en la
-  consulta.
+- **Filtrado en SQL, desempate en el dominio**: la consulta JPA solo filtra por
+  `brandId`/`productId`/rango de fechas; decidir cuál de las candidatas solapadas gana por prioridad 
+  es una regla de negocio y vive en `ApplicablePriceSelector` (dominio puro, sin Spring ni JPA), 
+  no en el `ORDER BY`/`LIMIT` de la query. Así la regla es testeable de forma aislada y no queda implícita en el
+  contrato del puerto de salida — cualquier adaptador nuevo (caché, otro motor, un
+  servicio externo) hereda la regla sin tener que reimplementarla.
 - **"No encontrado" no es una excepción**: `Optional<ApplicablePrice>` vacío es un
   resultado válido de una consulta, no un caso excepcional; el adaptador web decide
   que eso significa 404, no el dominio.

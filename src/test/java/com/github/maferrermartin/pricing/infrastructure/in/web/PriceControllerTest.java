@@ -38,7 +38,7 @@ class PriceControllerTest {
 		var start = LocalDateTime.of(2020, 6, 14, 0, 0);
 		var end = LocalDateTime.of(2020, 12, 31, 23, 59, 59);
 		var applicablePrice = new ApplicablePrice(
-				35455L, 1L, 1L, start, end, new BigDecimal("35.50"), Currency.getInstance("EUR"));
+				35455L, 1L, 1L, 0, start, end, new BigDecimal("35.50"), Currency.getInstance("EUR"));
 		when(findApplicablePriceQuery.find(any(), eq(1L), eq(35455L))).thenReturn(Optional.of(applicablePrice));
 
 		mockMvc.perform(get(ENDPOINT)
