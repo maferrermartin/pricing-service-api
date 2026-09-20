@@ -344,3 +344,4 @@ sin tocar nada a mano tras el `up`.
 ## Propuestas de mejora
 
 - **Rate Limiting Escalable**: Incorporar un mecanismo de rate limiting (error http 429) para proteger los endpoints. Para poder ser escalable a múltiples réplicas se podría integrar un backend compartido (ej. Redis) o delegar la lógica de limitación a un proxy inverso o API Gateway en la capa de red (ej. Nginx).
+- **Chaos tests**: A nivel local para testear un funcionamiento simulado tratando de realizar peticiones simultáneas en distintos tiempos y pruebas de disponibilidad y rendimiento.
