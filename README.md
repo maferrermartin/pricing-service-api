@@ -144,6 +144,8 @@ fuera de su paquete, para reforzar el límite hexagonal.
   `docker-compose.yaml`, así que ninguno es alcanzable desde fuera del contenedor;
   solo el `HEALTHCHECK` del propio `Dockerfile` los consulta desde dentro.
 - **Idioma**: `Accept-Language` con español por defecto (ver siguiente sección).
+- **TTL del `Cache-Control` HTTP**: `pricing.api.price-cache-ttl` (por defecto `5m`),
+  inyectado en `PriceController`.
 
 ## Caché
 
@@ -158,9 +160,10 @@ mismo hit de caché, no solo las peticiones que repiten la fecha exacta.
   necesidad de una caché compartida entre réplicas — las tarifas cambian con poca
   frecuencia, así que cada instancia resolviendo su propio primer *miss* es un coste
   asumible, y evita añadir una pieza de infraestructura nueva.
-- **Caducidad**: `expireAfterWrite=5m` (`application.properties`), la misma ventana que el
-  `Cache-Control: max-age=300` que ya devuelve `PriceController` — una única política de
-  caducidad, no dos desconectadas entre sí.
+- **Caducidad**: `expireAfterWrite=5m` (`application.properties`), la misma ventana que
+  `pricing.api.price-cache-ttl` (el `Cache-Control` HTTP de `PriceController`, ver
+  [Configuración](#configuración)) — una única política de caducidad, no dos
+  desconectadas entre sí, y ninguna hardcodeada en código.
 - **Caso "no encontrado" también se cachea**: el método nunca devuelve `null` (lista vacía
   en el peor caso), así que una combinación de marca/producto inexistente tampoco repite
   la consulta a BD en cada intento.
@@ -200,7 +203,7 @@ Validator y siguen el mismo `Accept-Language` sin configuración extra.
 ./gradlew performanceTest   # rendimiento contra Postgres real en Docker, bajo demanda
 ```
 
-53 tests en 14 clases:
+59 tests en 15 clases:
 
 | Clase                                     | Qué cubre                                                       |
 |--------------------------------------------|-----------------------------------------------------------------|
@@ -212,11 +215,12 @@ Validator y siguen el mismo `Accept-Language` sin configuración extra.
 | `JpaLoadApplicablePriceAdapterCachingIT`  | la caché no repite la consulta para la misma marca/producto     |
 | `PriceRateJpaRepositoryTest`              | la consulta derivada (`@DataJpaTest`), aislada                  |
 | `PriceRateEntityTest`                     | asignación correcta de los argumentos del constructor           |
-| `PriceControllerTest`                     | controlador (`@WebMvcTest`), Optional→200/404, `Cache-Control`  |
+| `PriceControllerTest`                     | controlador (`@WebMvcTest`), Optional→200/404, `Cache-Control` (TTL configurado) |
 | `PriceControllerIT`                       | los 5 casos del enunciado + errores + i18n + `X-Request-Id`     |
 | `RestExceptionHandlerTest`                | cada handler de error, en español e inglés                      |
 | `PriceResponseTest`                       | mapeo del DTO de respuesta                                      |
 | `RequestIdFilterTest`                     | genera/respeta el `X-Request-Id`, lo mete en el MDC y lo limpia |
+| `OpenApiConfigTest`                       | traducción de la spec OpenAPI (info + propiedades de schema), casos límite |
 
 **Test de rendimiento** (`PricingModulePerformanceIT`, tag `performance`, excluido de
 `./gradlew test`): levanta un PostgreSQL real en Docker (vía Testcontainers) con
@@ -229,7 +233,7 @@ esa escala. Incluye además una comparación real de caché fría vs. caliente (
 
 **Cobertura de código** (JaCoCo, plugin nativo de Gradle): `./gradlew check` genera el
 informe (`build/reports/jacoco/test/html/index.html`) y falla si la cobertura de
-líneas baja del 70%.
+líneas baja del 85%.
 
 ## Docker
 

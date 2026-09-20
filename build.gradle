@@ -112,7 +112,7 @@ tasks.named('jacocoTestCoverageVerification') {
 	violationRules {
 		rule {
 			limit {
-				minimum = 0.70
+				minimum = 0.85
 			}
 		}
 	}
